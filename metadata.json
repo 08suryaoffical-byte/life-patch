@@ -1,0 +1,7 @@
+{
+  "name": "LifePatch SSF - Personal Safety & Wearable Telemetry",
+  "description": "Medical-grade smart wearable protection unit integrated with Tamil Nadu Police Singappen Special Force (SSF 1091 & 112) for 24/7 personal safety and biometric distress dispatch.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

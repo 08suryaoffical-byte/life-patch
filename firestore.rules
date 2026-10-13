@@ -1,0 +1,145 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default Deny all unspecified access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Common Security Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Validation Blueprint for UserProfile
+    function isValidUserProfile(data, userId) {
+      return data.uid == userId
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.email is string && data.email.size() > 0 && data.email.size() <= 150
+        && (!('age' in data) || data.age is number)
+        && (!('gender' in data) || (data.gender is string && data.gender.size() <= 30))
+        && (!('mobileNumber' in data) || (data.mobileNumber is string && data.mobileNumber.size() <= 30))
+        && (!('bloodGroup' in data) || (data.bloodGroup is string && data.bloodGroup.size() <= 30))
+        && (!('serialId' in data) || (data.serialId is string && data.serialId.size() <= 60))
+        && (!('allergies' in data) || (data.allergies is string && data.allergies.size() <= 500))
+        && (!('cardiacImplants' in data) || (data.cardiacImplants is string && data.cardiacImplants.size() <= 300))
+        && (!('emergencyNotes' in data) || (data.emergencyNotes is string && data.emergencyNotes.size() <= 1000))
+        && (!('primaryContact' in data) || (data.primaryContact is string && data.primaryContact.size() <= 100))
+        && (!('primaryPhone' in data) || (data.primaryPhone is string && data.primaryPhone.size() <= 30));
+    }
+
+    // Validation Blueprint for EmergencyContact
+    function isValidContact(data, userId) {
+      return data.userId == userId
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.phone is string && data.phone.size() > 0 && data.phone.size() <= 30
+        && (!('relation' in data) || (data.relation is string && data.relation.size() <= 60))
+        && (!('priority' in data) || data.priority is number)
+        && (!('status' in data) || (data.status is string && (data.status in ['acknowledged', 'delivered', 'failed', 'pending'])))
+        && (!('statusDetails' in data) || (data.statusDetails is string && data.statusDetails.size() <= 200));
+    }
+
+    // Validation Blueprint for SafetyEvent
+    function isValidSafetyEvent(data, userId) {
+      return data.userId == userId
+        && data.type is string && (data.type in [
+          'sos_triggered',
+          'sos_resolved',
+          'emergency_dial',
+          'emergency_call_attempt',
+          'emergency_call_connected',
+          'vitals_alert',
+          'route_sync',
+          'system'
+        ])
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 150
+        && (!('description' in data) || (data.description is string && data.description.size() <= 500))
+        && (!('severity' in data) || (data.severity is string && (data.severity in ['critical', 'warning', 'info', 'success'])));
+    }
+
+    // Validation Blueprint for UserLocation
+    function isValidLocation(data, userId) {
+      return data.userId == userId
+        && data.latitude is number && data.latitude >= -90.0 && data.latitude <= 90.0
+        && data.longitude is number && data.longitude >= -180.0 && data.longitude <= 180.0
+        && data.accuracy is number && data.accuracy >= 0.0
+        && data.timestamp is string && data.timestamp.size() > 0 && data.timestamp.size() <= 60
+        && (!('altitude' in data) || data.altitude == null || data.altitude is number)
+        && (!('heading' in data) || data.heading == null || data.heading is number)
+        && (!('speed' in data) || data.speed == null || data.speed is number)
+        && (!('isLiveSharing' in data) || data.isLiveSharing is bool)
+        && (!('battery' in data) || data.battery is number)
+        && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 60));
+    }
+
+    // Validation Blueprint for VitalReadingRecord
+    function isValidVitalReading(data, userId) {
+      return data.userId == userId
+        && data.id is string && data.id.size() > 0 && data.id.size() <= 128
+        && data.pulseBpm is number && data.pulseBpm >= 20.0 && data.pulseBpm <= 260.0
+        && data.spo2 is number && data.spo2 >= 50.0 && data.spo2 <= 100.0
+        && data.skinTemp is number && data.skinTemp >= 25.0 && data.skinTemp <= 45.0
+        && data.timestamp is string && data.timestamp.size() > 0 && data.timestamp.size() <= 60
+        && (!('pulseRhythm' in data) || data.pulseRhythm in ['Normal', 'Irregular', 'Not Available'])
+        && (!('fallState' in data) || data.fallState in ['no_fall', 'possible_fall', 'fall_detected'])
+        && (!('riskLevel' in data) || data.riskLevel in ['normal', 'low', 'moderate', 'high_priority'])
+        && (!('source' in data) || data.source in ['ble_sensor', 'manual', 'device']);
+    }
+
+    // User Profile Document & Per-User Subcollections
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false; // Users access their own document directly via get, no broad collection scans
+      allow create: if isValidId(userId) && isOwner(userId) && isValidUserProfile(request.resource.data, userId);
+      allow update: if isValidId(userId) && isOwner(userId) && isValidUserProfile(request.resource.data, userId)
+        && request.resource.data.uid == resource.data.uid;
+      allow delete: if isValidId(userId) && isOwner(userId);
+
+      // Emergency Contacts Subcollection
+      match /contacts/{contactId} {
+        allow get, list: if isValidId(userId) && isOwner(userId);
+        allow create: if isValidId(userId) && isOwner(userId) && isValidContact(request.resource.data, userId);
+        allow update: if isValidId(userId) && isOwner(userId) && isValidContact(request.resource.data, userId)
+          && request.resource.data.userId == resource.data.userId;
+        allow delete: if isValidId(userId) && isOwner(userId);
+      }
+
+      // Safety Events Subcollection (Immutable & tamper-proof audit log)
+      match /safetyEvents/{eventId} {
+        allow get, list: if isValidId(userId) && isOwner(userId);
+        allow create: if isValidId(userId) && isOwner(userId) && isValidSafetyEvent(request.resource.data, userId);
+        allow update, delete: if false; // Events are strictly protected from modification or deletion
+      }
+
+      // Real-Time GPS Location Subcollection (/users/{userId}/location/{locationDoc})
+      match /location/{locationDoc} {
+        allow get: if isValidId(userId) && (
+          isOwner(userId) ||
+          (isSignedIn() && resource.data.isLiveSharing == true && exists(/databases/$(database)/documents/users/$(userId)/contacts/$(request.auth.uid)))
+        );
+        allow list: if isValidId(userId) && isOwner(userId);
+        allow create: if isValidId(userId) && isOwner(userId) && isValidLocation(request.resource.data, userId);
+        allow update: if isValidId(userId) && isOwner(userId) && isValidLocation(request.resource.data, userId)
+          && request.resource.data.userId == resource.data.userId;
+        allow delete: if isValidId(userId) && isOwner(userId);
+      }
+
+      // Biometric Health Telemetry Logs Subcollection (Immutable sensor audit log)
+      match /vitalsLogs/{readingId} {
+        allow get, list: if isValidId(userId) && isOwner(userId);
+        allow create: if isValidId(userId) && isOwner(userId) && isValidVitalReading(request.resource.data, userId);
+        allow update, delete: if false; // Health sensor telemetry records are immutable for audit integrity
+      }
+    }
+  }
+}

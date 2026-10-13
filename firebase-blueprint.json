@@ -1,0 +1,133 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with personal and medical wearable telemetry configuration",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "age": { "type": "number" },
+        "gender": { "type": "string", "maxLength": 30 },
+        "mobileNumber": { "type": "string", "maxLength": 30 },
+        "bloodGroup": { "type": "string", "maxLength": 30 },
+        "serialId": { "type": "string", "maxLength": 60 },
+        "allergies": { "type": "string", "maxLength": 500 },
+        "cardiacImplants": { "type": "string", "maxLength": 300 },
+        "emergencyNotes": { "type": "string", "maxLength": 1000 },
+        "primaryContact": { "type": "string", "maxLength": 100 },
+        "primaryPhone": { "type": "string", "maxLength": 30 },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["uid", "name", "email"]
+    },
+    "EmergencyContact": {
+      "title": "EmergencyContact",
+      "description": "Personal emergency guardian contact",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "relation": { "type": "string", "maxLength": 60 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "priority": { "type": "number" },
+        "status": { "type": "string", "enum": ["acknowledged", "delivered", "failed", "pending"] },
+        "statusDetails": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "userId", "name", "phone"]
+    },
+    "SafetyEvent": {
+      "title": "SafetyEvent",
+      "description": "Chronological safety dispatch and distress telemetry event",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["sos_triggered", "sos_resolved", "emergency_dial", "emergency_call_attempt", "emergency_call_connected", "vitals_alert", "route_sync", "system"] },
+        "title": { "type": "string", "maxLength": 150 },
+        "description": { "type": "string", "maxLength": 500 },
+        "severity": { "type": "string", "enum": ["critical", "warning", "info", "success"] },
+        "timestamp": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "location": {
+          "type": "object",
+          "properties": {
+            "latitude": { "type": "number" },
+            "longitude": { "type": "number" },
+            "accuracy": { "type": "number" },
+            "timestamp": { "type": "string", "maxLength": 50 },
+            "isFresh": { "type": "boolean" }
+          }
+        }
+      },
+      "required": ["id", "userId", "type", "title"]
+    },
+    "UserLocation": {
+      "title": "UserLocation",
+      "description": "Real-time device GPS coordinates and live guardian sharing telemetry",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "accuracy": { "type": "number" },
+        "altitude": { "type": ["number", "null"] },
+        "heading": { "type": ["number", "null"] },
+        "speed": { "type": ["number", "null"] },
+        "timestamp": { "type": "string", "maxLength": 50 },
+        "isLiveSharing": { "type": "boolean" },
+        "battery": { "type": "number" },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["userId", "latitude", "longitude", "accuracy", "timestamp"]
+    },
+    "VitalReadingRecord": {
+      "title": "VitalReadingRecord",
+      "description": "Authenticated user authentic health sensor telemetry reading log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "pulseBpm": { "type": "number" },
+        "pulseRhythm": { "type": "string", "enum": ["Normal", "Irregular", "Not Available"] },
+        "spo2": { "type": "number" },
+        "skinTemp": { "type": "number" },
+        "activityLevel": { "type": "string", "maxLength": 50 },
+        "inactivityMinutes": { "type": "number" },
+        "fallState": { "type": "string", "enum": ["no_fall", "possible_fall", "fall_detected"] },
+        "riskLevel": { "type": "string", "enum": ["normal", "low", "moderate", "high_priority"] },
+        "source": { "type": "string", "enum": ["ble_sensor", "manual", "device"] },
+        "timestamp": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "userId", "pulseBpm", "spo2", "skinTemp", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Individual user profile and medical telemetry configuration"
+    },
+    "/users/{userId}/contacts/{contactId}": {
+      "schema": "EmergencyContact",
+      "description": "Emergency guardian contacts for the user"
+    },
+    "/users/{userId}/safetyEvents/{eventId}": {
+      "schema": "SafetyEvent",
+      "description": "Chronological safety alerts and dispatch events"
+    },
+    "/users/{userId}/location/{locationId}": {
+      "schema": "UserLocation",
+      "description": "User's current GPS location and guardian sharing state"
+    },
+    "/users/{userId}/vitalsLogs/{readingId}": {
+      "schema": "VitalReadingRecord",
+      "description": "Authenticated user real biometric sensor logs"
+    }
+  }
+}
